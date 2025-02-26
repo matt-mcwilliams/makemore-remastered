@@ -10,6 +10,7 @@ A remaster of Andrej Karpathy's makemore!
 
 import torch
 import torch.nn.functional as F
+import os
 
 
 # ----------------------------
@@ -33,17 +34,7 @@ class Bigram():
 
 
 
-if __name__ == '__main__':
-    
-    g = torch.Generator().manual_seed(314159265)
-
-    # ---------- select model ----------
-
-    model = Bigram(27, generator=g)
-
-
-    # ---------- load words -->  xs,  ys ----------
-
+def train_model(model):
     context_length = model.context_length()
     with open('names.txt', 'r') as file:
 
@@ -91,7 +82,50 @@ if __name__ == '__main__':
         # update
         for p in model.parameters():
             p.data += -10 * p.grad
+
+
+
+def save_model(model):
+    torch.save(model.W, 'models/bigram.pt')
+
+
+
+
+
+if __name__ == '__main__':
     
+    g = torch.Generator().manual_seed(314159265)
+
+    # ---------- select model ----------
+
+    model = Bigram(27, generator=g)
+
+
+    # ---------- check for pre-trained network ----------
+    
+    pretrained = False
+    if os.path.exists('models/bigram.pt'):
+        model.W = torch.load('models/bigram.pt')
+        pretrained = True
+
+
+    # ---------- train model -----------
+
+    if not pretrained:
+        train_model(model)
+        save_model(model)
+    
+
+    # ---------- load vocab -----------
+
+    context_length = model.context_length()
+    with open('names.txt', 'r') as file:
+
+        words = ['.'*context_length + w.strip() + '.' for w in file.readlines()]
+
+    vocab = sorted(list(set(''.join(words))))
+    stoi = {c:i for i,c in enumerate(vocab)}
+    itos = {i:c for c,i in stoi.items()}
 
 
     # generate ten names
@@ -114,11 +148,3 @@ if __name__ == '__main__':
             out += itos[ix.item()]
         
         print(out)
-            
-
-
-    
-    
-    
-    
-    pass
