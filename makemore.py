@@ -11,6 +11,7 @@ A remaster of Andrej Karpathy's makemore!
 import torch
 import torch.nn.functional as F
 import os
+import argparse
 
 
 # ----------------------------
@@ -22,7 +23,8 @@ class Bigram():
     def __init__(self, vocab_size, generator=None):
         self.W = torch.randn((27,27), generator=generator, requires_grad=True)
     
-    def forward(self, xenc):
+    def forward(self, x):
+        xenc = F.one_hot(x, num_classes=27).float()
         return xenc @ self.W
     
     def parameters(self):
@@ -47,12 +49,14 @@ def train_model(model):
     xs = []
     ys = []
 
-    # TODO: Allow for longer context lengths. currently this approach only works for cl = 1
     for w in words:
-        pairs = [(x,y) for x,y in zip(w, w[1:])]
-        indexed_pairs = [(stoi[x], stoi[y]) for x,y in pairs]
-        xs += [x for x,y in indexed_pairs]
-        ys += [y for x,y in indexed_pairs]
+        for i in range(len(w)-context_length-1):
+            x = [ stoi[s] for s in w[i:i+context_length] ]
+            y = stoi[ w[i+context_length+1] ]
+            xs.append(x)
+            ys.append(y)
+
+
     
     xs = torch.tensor(xs)
     ys = torch.tensor(ys)
@@ -64,13 +68,12 @@ def train_model(model):
     for epoch in range(200):
         
         # forward pass
-        xenc = F.one_hot(xs, num_classes=27).float()
-        logits = model.forward(xenc)
+        logits = model.forward(xs).view(-1,27)
         counts = logits.exp()
         probs = counts / counts.sum(1, keepdim=True)
         loss = -probs[torch.arange(probs.size(0)), ys].log().mean()
 
-        print(loss)
+        print(f'{epoch}, {loss.item()}')
 
 
         # backward pass
@@ -93,6 +96,21 @@ def save_model(model):
 
 
 if __name__ == '__main__':
+
+    # ---------- arg parsing ----------
+
+    parser = argparse.ArgumentParser(
+        description="Description of your program",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument("--restart_training", "-r", action="store_true",
+                        help="Restart the training of the currently selected model.")
+    
+    restart_training = parser.parse_args().restart_training
+
+
+    # ==================================
     
     g = torch.Generator().manual_seed(314159265)
 
@@ -104,7 +122,7 @@ if __name__ == '__main__':
     # ---------- check for pre-trained network ----------
     
     pretrained = False
-    if os.path.exists('models/bigram.pt'):
+    if not restart_training and os.path.exists('models/bigram.pt'):
         model.W = torch.load('models/bigram.pt')
         pretrained = True
 
@@ -128,15 +146,14 @@ if __name__ == '__main__':
     itos = {i:c for c,i in stoi.items()}
 
 
-    # generate ten names
+    # -------- generate ten names -------------
     
     for i in range(10):
 
-        ix = torch.tensor(0) # []
+        ix = torch.tensor(0)
         out = ''
         while True:
-            xenc = F.one_hot(ix, num_classes=27).float()  # [27]
-            logits = model.forward(xenc)
+            logits = model.forward(ix)
             counts = logits.exp()
             probs = counts / counts.sum()
 
