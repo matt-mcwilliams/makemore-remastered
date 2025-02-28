@@ -61,6 +61,28 @@ class Trigram():
         return 2
 
 
+# -------------------
+# Multi-Activated Trigram (2 neurons activate every time)
+# -------------------
+
+class MultiActivatedTrigram():
+
+    def __init__(self, generator):
+        self.W = torch.randn((27*2,27), generator=generator, requires_grad=True)
+
+    def forward(self, X):
+        bit1 = F.one_hot(X[...,0], num_classes=27).float()
+        bit2 = F.one_hot(X[...,1], num_classes=27).float()
+        xenc = torch.cat((bit1, bit2), -1)
+        return xenc @ self.W
+    
+    def parameters(self):
+        return [ self.W ]
+    
+    def context_length(self):
+        return 2
+
+
 
 # ==========================
 
@@ -160,6 +182,9 @@ if __name__ == '__main__':
         
         case "trigram":
             model = Trigram(generator=g)
+        
+        case "ma-trigram":
+            model = MultiActivatedTrigram(generator=g)
         
         case _:
             raise Exception("Model is not availible!")
